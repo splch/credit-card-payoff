@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Credit Card Pay-Off Optimizer</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f2f2f2;
+        margin: 0;
+        padding: 20px;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      h1,
+      h2 {
+        text-align: center;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+      th,
+      td {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        text-align: center;
+      }
+      button {
+        margin: 10px 0;
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      input[type="number"] {
+        width: 100%;
+        padding: 6px;
+        box-sizing: border-box;
+      }
+      .result {
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Credit Card Pay-Off Optimizer</h1>
+      <p>
+        Enter your credit card details below along with the total budget you can
+        use to pay them off. This tool uses the debt avalanche method—allocating
+        funds to the cards with the highest interest rates first—to minimize
+        your total interest costs.
+      </p>
+
+      <label for="totalBudget"
+        ><strong>Total Budget Available ($):</strong></label
+      >
+      <input
+        type="number"
+        id="totalBudget"
+        placeholder="e.g., 1000"
+        min="0"
+        step="0.01"
+      />
+
+      <table id="cardsTable">
+        <thead>
+          <tr>
+            <th>Card #</th>
+            <th>Balance ($)</th>
+            <th>Interest Rate (%)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Credit card rows will be inserted here -->
+        </tbody>
+      </table>
+      <button id="addCardBtn">Add Credit Card</button>
+      <button id="calculateBtn">Calculate Payment Allocation</button>
+
+      <div class="result" id="result">
+        <!-- The allocation results will appear here -->
+      </div>
+    </div>
+
+    <script>
+      let cardCount = 0;
+
+      // Function to add a new credit card row in the table
+      function addCardRow(balance = "", rate = "") {
+        cardCount++;
+        const tbody = document.querySelector("#cardsTable tbody");
+        const tr = document.createElement("tr");
+        tr.id = "cardRow" + cardCount;
+        tr.innerHTML = `
+        <td>${cardCount}</td>
+        <td><input type="number" class="balance" placeholder="Balance" min="0" step="0.01" value="${balance}"></td>
+        <td><input type="number" class="rate" placeholder="Interest Rate" min="0" step="0.01" value="${rate}"></td>
+        <td><button onclick="removeCardRow('${tr.id}')">Remove</button></td>
+      `;
+        tbody.appendChild(tr);
+      }
+
+      // Function to remove a credit card row
+      function removeCardRow(rowId) {
+        const row = document.getElementById(rowId);
+        if (row) {
+          row.remove();
+        }
+      }
+
+      // Add a new card row when the "Add Credit Card" button is clicked
+      document
+        .getElementById("addCardBtn")
+        .addEventListener("click", function () {
+          addCardRow();
+        });
+
+      // The core function that calculates how to allocate your payment
+      function calculatePayment() {
+        // Get the total budget entered by the user.
+        const totalBudgetInput = document.getElementById("totalBudget").value;
+        const totalBudget = parseFloat(totalBudgetInput);
+        if (isNaN(totalBudget) || totalBudget < 0) {
+          alert("Please enter a valid total budget.");
+          return;
+        }
+
+        // Gather credit card data from each row.
+        const cardRows = document.querySelectorAll("#cardsTable tbody tr");
+        if (cardRows.length === 0) {
+          alert("Please add at least one credit card.");
+          return;
+        }
+
+        let cards = [];
+        cardRows.forEach((row, index) => {
+          const balanceInput = row.querySelector(".balance").value;
+          const rateInput = row.querySelector(".rate").value;
+          const balance = parseFloat(balanceInput);
+          const rate = parseFloat(rateInput);
+
+          if (isNaN(balance) || balance < 0 || isNaN(rate) || rate < 0) {
+            alert(
+              "Please enter valid numbers for balance and interest rate for all cards."
+            );
+            return;
+          }
+
+          // Store the card details along with its original index.
+          cards.push({
+            index: index, // will be used to restore original order later
+            balance: balance,
+            rate: rate,
+            allocation: 0,
+          });
+        });
+
+        // Sort cards by interest rate in descending order (highest rate first)
+        let sortedCards = [...cards].sort((a, b) => b.rate - a.rate);
+
+        let remainingBudget = totalBudget;
+
+        // Allocate the budget following the "debt avalanche" strategy.
+        sortedCards.forEach((card) => {
+          if (remainingBudget <= 0) return;
+          // Payment allocated is the minimum of the remaining budget or the card’s full balance.
+          const payment = Math.min(remainingBudget, card.balance);
+          card.allocation = payment;
+          remainingBudget -= payment;
+        });
+
+        // Merge the allocation back to the original card order
+        cards.forEach((card) => {
+          const sortedCard = sortedCards.find((c) => c.index === card.index);
+          card.allocation = sortedCard ? sortedCard.allocation : 0;
+        });
+
+        // Display the results.
+        displayResults(cards, totalBudget);
+      }
+
+      // Function to display the allocation results in a table.
+      function displayResults(cards, totalBudget) {
+        let resultDiv = document.getElementById("result");
+        resultDiv.innerHTML = "<h2>Payment Allocation Results</h2>";
+
+        let tableHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Card #</th>
+              <th>Balance ($)</th>
+              <th>Interest Rate (%)</th>
+              <th>Payment Allocation ($)</th>
+              <th>Remaining Balance ($)</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+        cards.forEach((card, idx) => {
+          const remainingBalance = (card.balance - card.allocation).toFixed(2);
+          tableHTML += `
+          <tr>
+            <td>${idx + 1}</td>
+            <td>${card.balance.toFixed(2)}</td>
+            <td>${card.rate.toFixed(2)}</td>
+            <td>${card.allocation.toFixed(2)}</td>
+            <td>${remainingBalance}</td>
+          </tr>
+        `;
+        });
+
+        tableHTML += `
+          </tbody>
+        </table>
+        <p><strong>Total Budget Allocated:</strong> $${totalBudget.toFixed(
+          2
+        )}</p>
+      `;
+
+        resultDiv.innerHTML = tableHTML;
+      }
+
+      // Attach the calculate function to the "Calculate Payment Allocation" button.
+      document
+        .getElementById("calculateBtn")
+        .addEventListener("click", calculatePayment);
+
+      // Add an initial credit card row for convenience.
+      addCardRow();
+    </script>
+  </body>
+</html>
