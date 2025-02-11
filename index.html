@@ -2,25 +2,55 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Credit Card Pay-Off Optimizer</title>
     <style>
+      /* Base Styles */
       body {
         font-family: Arial, sans-serif;
         background-color: #f2f2f2;
         margin: 0;
         padding: 20px;
+        color: #333;
       }
       .container {
         max-width: 900px;
         margin: 0 auto;
         background-color: #fff;
-        padding: 20px;
+        padding: 20px 30px;
         border-radius: 8px;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      header,
+      section {
+        margin-bottom: 20px;
       }
       h1,
       h2 {
         text-align: center;
+      }
+      p {
+        line-height: 1.6;
+      }
+      /* Form Styles */
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        font-weight: bold;
+        display: block;
+        margin-bottom: 5px;
+      }
+      input[type="number"] {
+        width: 100%;
+        padding: 8px;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      /* Table Styles */
+      .table-container {
+        overflow-x: auto;
       }
       table {
         width: 100%;
@@ -29,12 +59,17 @@
       }
       th,
       td {
-        padding: 8px 12px;
+        padding: 10px;
         border: 1px solid #ddd;
         text-align: center;
       }
+      /* Button Styles */
+      .button-group {
+        text-align: center;
+        margin: 20px 0;
+      }
       button {
-        margin: 10px 0;
+        margin: 10px 5px;
         padding: 10px 20px;
         background-color: #007bff;
         color: #fff;
@@ -45,11 +80,7 @@
       button:hover {
         background-color: #0056b3;
       }
-      input[type="number"] {
-        width: 100%;
-        padding: 6px;
-        box-sizing: border-box;
-      }
+      /* Result and Error Styles */
       .result {
         margin-top: 20px;
       }
@@ -57,278 +88,332 @@
         color: red;
         font-weight: bold;
         margin-top: 10px;
+        text-align: center;
+      }
+      /* Responsive adjustments */
+      @media (max-width: 600px) {
+        .container {
+          padding: 15px 20px;
+        }
+        th,
+        td {
+          padding: 8px;
+        }
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>Credit Card Pay-Off Optimizer</h1>
-      <p>
-        Enter your credit card details along with your total available budget.
-        For each card, if you leave the Minimum Payment field blank, a default
-        value will be used based on the card’s balance (approximately 2% of the
-        balance, but not less than \$25 when applicable). Once the minimums are
-        met, any extra funds will be allocated using the debt avalanche method
-        (targeting cards with the highest interest rates first) to minimize
-        total interest.
-      </p>
+      <header>
+        <h1>Credit Card Pay-Off Optimizer</h1>
+        <p>
+          Enter your credit card details along with your total available budget.
+          For each card, if you leave the Minimum Payment field blank, a default
+          value will be used based on the card's balance (approximately 2% of
+          the balance, but not less than $25 when applicable). Once the minimums
+          are met, any extra funds will be allocated using the debt avalanche
+          method (targeting cards with the highest interest rates first) to
+          minimize total interest.
+        </p>
+      </header>
 
-      <label for="totalBudget"
-        ><strong>Total Budget Available ($):</strong></label
-      >
-      <input
-        type="number"
-        id="totalBudget"
-        placeholder="e.g., 1000"
-        min="0"
-        step="0.01"
-      />
+      <section class="form-group">
+        <label for="totalBudget">Total Budget Available ($):</label>
+        <input
+          type="number"
+          id="totalBudget"
+          placeholder="e.g., 1000"
+          min="0"
+          step="0.01"
+        />
+      </section>
 
-      <table id="cardsTable">
-        <thead>
-          <tr>
-            <th>Card #</th>
-            <th>Balance ($)</th>
-            <th>Interest Rate (%)</th>
-            <th>Minimum Payment ($)</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Credit card rows will be inserted here -->
-        </tbody>
-      </table>
-      <button id="addCardBtn">Add Credit Card</button>
-      <button id="calculateBtn">Calculate Payment Allocation</button>
-
-      <div class="result" id="result">
-        <!-- The allocation results will appear here -->
-      </div>
-      <div class="error" id="error"></div>
-    </div>
-
-    <script>
-      let cardCount = 0;
-
-      /**
-       * Computes a default (average) minimum payment based on the card’s balance.
-       * For this example, we assume a typical minimum payment of 2% of the balance.
-       * However, if 2% is less than $25 and the balance is more than $25, we use $25.
-       * If the balance is less than $25, the default minimum is simply the balance.
-       */
-      function computeDefaultMinPayment(balance) {
-        const percentage = 0.02;
-        let computed = balance * percentage;
-        if (balance > 25 && computed < 25) {
-          return 25;
-        } else if (balance <= 25) {
-          return balance;
-        }
-        return computed;
-      }
-
-      // Function to add a new credit card row in the table.
-      function addCardRow(balance = "", rate = "") {
-        cardCount++;
-        const tbody = document.querySelector("#cardsTable tbody");
-        const tr = document.createElement("tr");
-        tr.id = "cardRow" + cardCount;
-        tr.innerHTML = `
-        <td>${cardCount}</td>
-        <td><input type="number" class="balance" placeholder="Balance" min="0" step="0.01" value="${balance}"></td>
-        <td><input type="number" class="rate" placeholder="Interest Rate" min="0" step="0.01" value="${rate}"></td>
-        <td>
-          <input type="number" class="minPay" placeholder="Auto computed" min="0" step="0.01">
-        </td>
-        <td><button onclick="removeCardRow('${tr.id}')">Remove</button></td>
-      `;
-        tbody.appendChild(tr);
-
-        // Add an event listener on the balance input so that when the balance changes,
-        // the corresponding Minimum Payment field shows an updated placeholder.
-        const balanceInput = tr.querySelector(".balance");
-        const minPayInput = tr.querySelector(".minPay");
-        balanceInput.addEventListener("input", function () {
-          const balanceVal = parseFloat(this.value);
-          if (!isNaN(balanceVal) && balanceVal >= 0) {
-            const defaultMin = computeDefaultMinPayment(balanceVal).toFixed(2);
-            minPayInput.placeholder = defaultMin;
-          } else {
-            minPayInput.placeholder = "Auto computed";
-          }
-        });
-      }
-
-      // Function to remove a credit card row.
-      function removeCardRow(rowId) {
-        const row = document.getElementById(rowId);
-        if (row) {
-          row.remove();
-        }
-      }
-
-      // Add a new card row when the "Add Credit Card" button is clicked.
-      document
-        .getElementById("addCardBtn")
-        .addEventListener("click", function () {
-          addCardRow();
-        });
-
-      // The core function that calculates the payment allocation, now using the computed minimum payment
-      // if the user hasn't provided one.
-      function calculatePayment() {
-        // Clear previous error messages.
-        document.getElementById("error").textContent = "";
-
-        // Get the total budget entered by the user.
-        const totalBudgetInput = document.getElementById("totalBudget").value;
-        const totalBudget = parseFloat(totalBudgetInput);
-        if (isNaN(totalBudget) || totalBudget < 0) {
-          alert("Please enter a valid total budget.");
-          return;
-        }
-
-        // Gather credit card data from each row.
-        const cardRows = document.querySelectorAll("#cardsTable tbody tr");
-        if (cardRows.length === 0) {
-          alert("Please add at least one credit card.");
-          return;
-        }
-
-        let cards = [];
-        let totalMinimumRequired = 0;
-        let hasInvalidInput = false;
-
-        cardRows.forEach((row, index) => {
-          const balanceInput = row.querySelector(".balance").value;
-          const rateInput = row.querySelector(".rate").value;
-          let minPayInput = row.querySelector(".minPay").value;
-
-          let balance = parseFloat(balanceInput);
-          let rate = parseFloat(rateInput);
-
-          if (isNaN(balance) || balance < 0 || isNaN(rate) || rate < 0) {
-            hasInvalidInput = true;
-            return;
-          }
-
-          // If the minimum payment is empty or invalid, compute the default value.
-          let minPayment;
-          if (minPayInput === "" || isNaN(parseFloat(minPayInput))) {
-            minPayment = computeDefaultMinPayment(balance);
-          } else {
-            minPayment = parseFloat(minPayInput);
-          }
-
-          // If the card’s balance is less than the specified minimum, then you only need to pay off the remaining balance.
-          if (balance < minPayment) {
-            minPayment = balance;
-          }
-
-          totalMinimumRequired += minPayment;
-
-          // Store the card details along with its original index.
-          cards.push({
-            index: index, // used later if desired for original ordering
-            balance: balance,
-            rate: rate,
-            minPayment: minPayment,
-            allocation: 0, // will hold the final allocated payment
-          });
-        });
-
-        if (hasInvalidInput) {
-          alert(
-            "Please enter valid numbers for balance and interest rate for all cards."
-          );
-          return;
-        }
-
-        // Check if the total budget is enough to cover the sum of all minimum payments.
-        if (totalBudget < totalMinimumRequired) {
-          document.getElementById("error").textContent =
-            "Error: Your total budget is insufficient to cover all minimum payments. Please increase your budget or adjust your inputs.";
-          return;
-        }
-
-        // First, allocate the minimum payments for each card.
-        cards.forEach((card) => {
-          card.allocation = card.minPayment;
-        });
-
-        // Calculate the extra funds available after paying all minimum payments.
-        let extraFunds = totalBudget - totalMinimumRequired;
-
-        // Sort cards by interest rate in descending order (highest rate first) for extra allocation.
-        let sortedCards = [...cards].sort((a, b) => b.rate - a.rate);
-
-        // Allocate extra funds to the cards, ensuring you don't pay more than the card’s balance.
-        sortedCards.forEach((card) => {
-          if (extraFunds <= 0) return;
-          // The additional amount you can pay on this card is limited by what remains after the minimum payment.
-          let remainingBalance = card.balance - card.minPayment;
-          if (remainingBalance <= 0) return;
-          let additionalPayment = Math.min(extraFunds, remainingBalance);
-          card.allocation += additionalPayment;
-          extraFunds -= additionalPayment;
-        });
-
-        // Display the results.
-        displayResults(cards, totalBudget);
-      }
-
-      // Function to display the allocation results in a table.
-      function displayResults(cards, totalBudget) {
-        let resultDiv = document.getElementById("result");
-        resultDiv.innerHTML = "<h2>Payment Allocation Results</h2>";
-
-        let tableHTML = `
-        <table>
+      <section class="table-container">
+        <table id="cardsTable">
           <thead>
             <tr>
               <th>Card #</th>
               <th>Balance ($)</th>
               <th>Interest Rate (%)</th>
               <th>Minimum Payment ($)</th>
-              <th>Total Payment Allocation ($)</th>
-              <th>Remaining Balance ($)</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
-      `;
-
-        cards.forEach((card, idx) => {
-          const remainingBalance = Math.max(0, card.balance - card.allocation);
-          tableHTML += `
-          <tr>
-            <td>${idx + 1}</td>
-            <td>${card.balance.toFixed(2)}</td>
-            <td>${card.rate.toFixed(2)}</td>
-            <td>${card.minPayment.toFixed(2)}</td>
-            <td>${card.allocation.toFixed(2)}</td>
-            <td>${remainingBalance.toFixed(2)}</td>
-          </tr>
-        `;
-        });
-
-        tableHTML += `
+            <!-- Credit card rows will be inserted here -->
           </tbody>
         </table>
-        <p><strong>Total Budget Allocated:</strong> $${totalBudget.toFixed(
-          2
-        )}</p>
-      `;
+      </section>
 
-        resultDiv.innerHTML = tableHTML;
-      }
+      <section class="button-group">
+        <button id="addCardBtn">Add Credit Card</button>
+        <button id="calculateBtn">Calculate Payment Allocation</button>
+      </section>
 
-      // Attach the calculate function to the "Calculate Payment Allocation" button.
-      document
-        .getElementById("calculateBtn")
-        .addEventListener("click", calculatePayment);
+      <section class="result" id="result">
+        <!-- The allocation results will appear here -->
+      </section>
+      <section class="error" id="error"></section>
+    </div>
 
-      // Add an initial credit card row for convenience.
-      addCardRow();
+    <script>
+      "use strict";
+
+      document.addEventListener("DOMContentLoaded", () => {
+        let cardCount = 0;
+
+        /**
+         * Computes a default minimum payment based on the card’s balance.
+         * Uses 2% of the balance, but if that is less than $25 (and balance > $25),
+         * it returns $25. If the balance is less than $25, the default is the balance.
+         *
+         * @param {number} balance The current balance of the card.
+         * @returns {number} The computed minimum payment.
+         */
+        const computeDefaultMinPayment = (balance) => {
+          const percentage = 0.02;
+          let computed = balance * percentage;
+          if (balance > 25 && computed < 25) {
+            return 25;
+          } else if (balance <= 25) {
+            return balance;
+          }
+          return computed;
+        };
+
+        /**
+         * Creates a new credit card row and appends it to the table.
+         *
+         * @param {string} balance Optional initial balance value.
+         * @param {string} rate Optional initial interest rate value.
+         */
+        const addCardRow = (balance = "", rate = "") => {
+          cardCount++;
+          const tbody = document.querySelector("#cardsTable tbody");
+          const tr = document.createElement("tr");
+          tr.id = "cardRow" + cardCount;
+
+          // Create cells
+          const cellCardNum = document.createElement("td");
+          cellCardNum.textContent = cardCount;
+
+          const cellBalance = document.createElement("td");
+          const inputBalance = document.createElement("input");
+          inputBalance.type = "number";
+          inputBalance.className = "balance";
+          inputBalance.placeholder = "Balance";
+          inputBalance.min = "0";
+          inputBalance.step = "0.01";
+          inputBalance.value = balance;
+          cellBalance.appendChild(inputBalance);
+
+          const cellRate = document.createElement("td");
+          const inputRate = document.createElement("input");
+          inputRate.type = "number";
+          inputRate.className = "rate";
+          inputRate.placeholder = "Interest Rate";
+          inputRate.min = "0";
+          inputRate.step = "0.01";
+          inputRate.value = rate;
+          cellRate.appendChild(inputRate);
+
+          const cellMinPay = document.createElement("td");
+          const inputMinPay = document.createElement("input");
+          inputMinPay.type = "number";
+          inputMinPay.className = "minPay";
+          inputMinPay.placeholder = "Auto computed";
+          inputMinPay.min = "0";
+          inputMinPay.step = "0.01";
+          cellMinPay.appendChild(inputMinPay);
+
+          const cellAction = document.createElement("td");
+          const removeBtn = document.createElement("button");
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", () => {
+            tr.remove();
+          });
+          cellAction.appendChild(removeBtn);
+
+          // Append cells to row
+          tr.appendChild(cellCardNum);
+          tr.appendChild(cellBalance);
+          tr.appendChild(cellRate);
+          tr.appendChild(cellMinPay);
+          tr.appendChild(cellAction);
+          tbody.appendChild(tr);
+
+          // Update Minimum Payment placeholder when balance input changes
+          inputBalance.addEventListener("input", function () {
+            const balanceVal = parseFloat(this.value);
+            if (!isNaN(balanceVal) && balanceVal >= 0) {
+              const defaultMin =
+                computeDefaultMinPayment(balanceVal).toFixed(2);
+              inputMinPay.placeholder = defaultMin;
+            } else {
+              inputMinPay.placeholder = "Auto computed";
+            }
+          });
+        };
+
+        /**
+         * Main function to calculate payment allocation based on user inputs.
+         */
+        const calculatePayment = () => {
+          // Clear previous error messages
+          document.getElementById("error").textContent = "";
+
+          const totalBudgetInput = document.getElementById("totalBudget").value;
+          const totalBudget = parseFloat(totalBudgetInput);
+          if (isNaN(totalBudget) || totalBudget < 0) {
+            alert("Please enter a valid total budget.");
+            return;
+          }
+
+          const cardRows = document.querySelectorAll("#cardsTable tbody tr");
+          if (cardRows.length === 0) {
+            alert("Please add at least one credit card.");
+            return;
+          }
+
+          const cards = [];
+          let totalMinimumRequired = 0;
+          let hasInvalidInput = false;
+
+          cardRows.forEach((row, index) => {
+            const balanceVal = parseFloat(row.querySelector(".balance").value);
+            const rateVal = parseFloat(row.querySelector(".rate").value);
+            let minPayVal = row.querySelector(".minPay").value;
+
+            if (
+              isNaN(balanceVal) ||
+              balanceVal < 0 ||
+              isNaN(rateVal) ||
+              rateVal < 0
+            ) {
+              hasInvalidInput = true;
+              return;
+            }
+
+            let minPayment;
+            if (minPayVal === "" || isNaN(parseFloat(minPayVal))) {
+              minPayment = computeDefaultMinPayment(balanceVal);
+            } else {
+              minPayment = parseFloat(minPayVal);
+            }
+
+            // Ensure the minimum payment does not exceed the balance.
+            if (balanceVal < minPayment) {
+              minPayment = balanceVal;
+            }
+
+            totalMinimumRequired += minPayment;
+
+            cards.push({
+              index: index,
+              balance: balanceVal,
+              rate: rateVal,
+              minPayment: minPayment,
+              allocation: 0, // To be computed later
+            });
+          });
+
+          if (hasInvalidInput) {
+            alert(
+              "Please enter valid numbers for balance and interest rate for all cards."
+            );
+            return;
+          }
+
+          if (totalBudget < totalMinimumRequired) {
+            document.getElementById("error").textContent =
+              "Error: Your total budget is insufficient to cover all minimum payments. Please increase your budget or adjust your inputs.";
+            return;
+          }
+
+          // First, allocate each card's minimum payment.
+          cards.forEach((card) => {
+            card.allocation = card.minPayment;
+          });
+
+          let extraFunds = totalBudget - totalMinimumRequired;
+
+          // Allocate extra funds using the debt avalanche method (highest rate first).
+          const sortedCards = [...cards].sort((a, b) => b.rate - a.rate);
+          sortedCards.forEach((card) => {
+            if (extraFunds <= 0) return;
+            const remainingBalance = card.balance - card.minPayment;
+            if (remainingBalance <= 0) return;
+            const additionalPayment = Math.min(extraFunds, remainingBalance);
+            card.allocation += additionalPayment;
+            extraFunds -= additionalPayment;
+          });
+
+          displayResults(cards, totalBudget);
+        };
+
+        /**
+         * Displays the allocation results in a formatted table.
+         *
+         * @param {Array} cards Array of card objects with payment details.
+         * @param {number} totalBudget The user's total available budget.
+         */
+        const displayResults = (cards, totalBudget) => {
+          const resultDiv = document.getElementById("result");
+          resultDiv.innerHTML = "<h2>Payment Allocation Results</h2>";
+
+          let tableHTML = `
+            <table>
+              <thead>
+                <tr>
+                  <th>Card #</th>
+                  <th>Balance ($)</th>
+                  <th>Interest Rate (%)</th>
+                  <th>Minimum Payment ($)</th>
+                  <th>Total Payment Allocation ($)</th>
+                  <th>Remaining Balance ($)</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+
+          cards.forEach((card, idx) => {
+            const remainingBalance = Math.max(
+              0,
+              card.balance - card.allocation
+            );
+            tableHTML += `
+              <tr>
+                <td>${idx + 1}</td>
+                <td>${card.balance.toFixed(2)}</td>
+                <td>${card.rate.toFixed(2)}</td>
+                <td>${card.minPayment.toFixed(2)}</td>
+                <td>${card.allocation.toFixed(2)}</td>
+                <td>${remainingBalance.toFixed(2)}</td>
+              </tr>
+            `;
+          });
+
+          tableHTML += `
+              </tbody>
+            </table>
+            <p style="text-align:center;"><strong>Total Budget Allocated:</strong> $${totalBudget.toFixed(
+              2
+            )}</p>
+          `;
+          resultDiv.innerHTML = tableHTML;
+        };
+
+        // Event Listeners for buttons
+        document
+          .getElementById("addCardBtn")
+          .addEventListener("click", () => addCardRow());
+        document
+          .getElementById("calculateBtn")
+          .addEventListener("click", calculatePayment);
+
+        // Add an initial credit card row for user convenience.
+        addCardRow();
+      });
     </script>
   </body>
 </html>
