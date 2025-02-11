@@ -11,7 +11,7 @@
         padding: 20px;
       }
       .container {
-        max-width: 800px;
+        max-width: 900px;
         margin: 0 auto;
         background-color: #fff;
         padding: 20px;
@@ -53,16 +53,24 @@
       .result {
         margin-top: 20px;
       }
+      .error {
+        color: red;
+        font-weight: bold;
+        margin-top: 10px;
+      }
     </style>
   </head>
   <body>
     <div class="container">
       <h1>Credit Card Pay-Off Optimizer</h1>
       <p>
-        Enter your credit card details below along with the total budget you can
-        use to pay them off. This tool uses the debt avalanche method—allocating
-        funds to the cards with the highest interest rates first—to minimize
-        your total interest costs.
+        Enter your credit card details along with your total available budget.
+        For each card, if you leave the Minimum Payment field blank, a default
+        value will be used based on the card’s balance (approximately 2% of the
+        balance, but not less than \$25 when applicable). Once the minimums are
+        met, any extra funds will be allocated using the debt avalanche method
+        (targeting cards with the highest interest rates first) to minimize
+        total interest.
       </p>
 
       <label for="totalBudget"
@@ -82,6 +90,7 @@
             <th>Card #</th>
             <th>Balance ($)</th>
             <th>Interest Rate (%)</th>
+            <th>Minimum Payment ($)</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -95,12 +104,30 @@
       <div class="result" id="result">
         <!-- The allocation results will appear here -->
       </div>
+      <div class="error" id="error"></div>
     </div>
 
     <script>
       let cardCount = 0;
 
-      // Function to add a new credit card row in the table
+      /**
+       * Computes a default (average) minimum payment based on the card’s balance.
+       * For this example, we assume a typical minimum payment of 2% of the balance.
+       * However, if 2% is less than $25 and the balance is more than $25, we use $25.
+       * If the balance is less than $25, the default minimum is simply the balance.
+       */
+      function computeDefaultMinPayment(balance) {
+        const percentage = 0.02;
+        let computed = balance * percentage;
+        if (balance > 25 && computed < 25) {
+          return 25;
+        } else if (balance <= 25) {
+          return balance;
+        }
+        return computed;
+      }
+
+      // Function to add a new credit card row in the table.
       function addCardRow(balance = "", rate = "") {
         cardCount++;
         const tbody = document.querySelector("#cardsTable tbody");
@@ -110,12 +137,29 @@
         <td>${cardCount}</td>
         <td><input type="number" class="balance" placeholder="Balance" min="0" step="0.01" value="${balance}"></td>
         <td><input type="number" class="rate" placeholder="Interest Rate" min="0" step="0.01" value="${rate}"></td>
+        <td>
+          <input type="number" class="minPay" placeholder="Auto computed" min="0" step="0.01">
+        </td>
         <td><button onclick="removeCardRow('${tr.id}')">Remove</button></td>
       `;
         tbody.appendChild(tr);
+
+        // Add an event listener on the balance input so that when the balance changes,
+        // the corresponding Minimum Payment field shows an updated placeholder.
+        const balanceInput = tr.querySelector(".balance");
+        const minPayInput = tr.querySelector(".minPay");
+        balanceInput.addEventListener("input", function () {
+          const balanceVal = parseFloat(this.value);
+          if (!isNaN(balanceVal) && balanceVal >= 0) {
+            const defaultMin = computeDefaultMinPayment(balanceVal).toFixed(2);
+            minPayInput.placeholder = defaultMin;
+          } else {
+            minPayInput.placeholder = "Auto computed";
+          }
+        });
       }
 
-      // Function to remove a credit card row
+      // Function to remove a credit card row.
       function removeCardRow(rowId) {
         const row = document.getElementById(rowId);
         if (row) {
@@ -123,15 +167,19 @@
         }
       }
 
-      // Add a new card row when the "Add Credit Card" button is clicked
+      // Add a new card row when the "Add Credit Card" button is clicked.
       document
         .getElementById("addCardBtn")
         .addEventListener("click", function () {
           addCardRow();
         });
 
-      // The core function that calculates how to allocate your payment
+      // The core function that calculates the payment allocation, now using the computed minimum payment
+      // if the user hasn't provided one.
       function calculatePayment() {
+        // Clear previous error messages.
+        document.getElementById("error").textContent = "";
+
         // Get the total budget entered by the user.
         const totalBudgetInput = document.getElementById("totalBudget").value;
         const totalBudget = parseFloat(totalBudgetInput);
@@ -148,46 +196,81 @@
         }
 
         let cards = [];
+        let totalMinimumRequired = 0;
+        let hasInvalidInput = false;
+
         cardRows.forEach((row, index) => {
           const balanceInput = row.querySelector(".balance").value;
           const rateInput = row.querySelector(".rate").value;
-          const balance = parseFloat(balanceInput);
-          const rate = parseFloat(rateInput);
+          let minPayInput = row.querySelector(".minPay").value;
+
+          let balance = parseFloat(balanceInput);
+          let rate = parseFloat(rateInput);
 
           if (isNaN(balance) || balance < 0 || isNaN(rate) || rate < 0) {
-            alert(
-              "Please enter valid numbers for balance and interest rate for all cards."
-            );
+            hasInvalidInput = true;
             return;
           }
 
+          // If the minimum payment is empty or invalid, compute the default value.
+          let minPayment;
+          if (minPayInput === "" || isNaN(parseFloat(minPayInput))) {
+            minPayment = computeDefaultMinPayment(balance);
+          } else {
+            minPayment = parseFloat(minPayInput);
+          }
+
+          // If the card’s balance is less than the specified minimum, then you only need to pay off the remaining balance.
+          if (balance < minPayment) {
+            minPayment = balance;
+          }
+
+          totalMinimumRequired += minPayment;
+
           // Store the card details along with its original index.
           cards.push({
-            index: index, // will be used to restore original order later
+            index: index, // used later if desired for original ordering
             balance: balance,
             rate: rate,
-            allocation: 0,
+            minPayment: minPayment,
+            allocation: 0, // will hold the final allocated payment
           });
         });
 
-        // Sort cards by interest rate in descending order (highest rate first)
-        let sortedCards = [...cards].sort((a, b) => b.rate - a.rate);
+        if (hasInvalidInput) {
+          alert(
+            "Please enter valid numbers for balance and interest rate for all cards."
+          );
+          return;
+        }
 
-        let remainingBudget = totalBudget;
+        // Check if the total budget is enough to cover the sum of all minimum payments.
+        if (totalBudget < totalMinimumRequired) {
+          document.getElementById("error").textContent =
+            "Error: Your total budget is insufficient to cover all minimum payments. Please increase your budget or adjust your inputs.";
+          return;
+        }
 
-        // Allocate the budget following the "debt avalanche" strategy.
-        sortedCards.forEach((card) => {
-          if (remainingBudget <= 0) return;
-          // Payment allocated is the minimum of the remaining budget or the card’s full balance.
-          const payment = Math.min(remainingBudget, card.balance);
-          card.allocation = payment;
-          remainingBudget -= payment;
+        // First, allocate the minimum payments for each card.
+        cards.forEach((card) => {
+          card.allocation = card.minPayment;
         });
 
-        // Merge the allocation back to the original card order
-        cards.forEach((card) => {
-          const sortedCard = sortedCards.find((c) => c.index === card.index);
-          card.allocation = sortedCard ? sortedCard.allocation : 0;
+        // Calculate the extra funds available after paying all minimum payments.
+        let extraFunds = totalBudget - totalMinimumRequired;
+
+        // Sort cards by interest rate in descending order (highest rate first) for extra allocation.
+        let sortedCards = [...cards].sort((a, b) => b.rate - a.rate);
+
+        // Allocate extra funds to the cards, ensuring you don't pay more than the card’s balance.
+        sortedCards.forEach((card) => {
+          if (extraFunds <= 0) return;
+          // The additional amount you can pay on this card is limited by what remains after the minimum payment.
+          let remainingBalance = card.balance - card.minPayment;
+          if (remainingBalance <= 0) return;
+          let additionalPayment = Math.min(extraFunds, remainingBalance);
+          card.allocation += additionalPayment;
+          extraFunds -= additionalPayment;
         });
 
         // Display the results.
@@ -206,7 +289,8 @@
               <th>Card #</th>
               <th>Balance ($)</th>
               <th>Interest Rate (%)</th>
-              <th>Payment Allocation ($)</th>
+              <th>Minimum Payment ($)</th>
+              <th>Total Payment Allocation ($)</th>
               <th>Remaining Balance ($)</th>
             </tr>
           </thead>
@@ -214,14 +298,15 @@
       `;
 
         cards.forEach((card, idx) => {
-          const remainingBalance = (card.balance - card.allocation).toFixed(2);
+          const remainingBalance = Math.max(0, card.balance - card.allocation);
           tableHTML += `
           <tr>
             <td>${idx + 1}</td>
             <td>${card.balance.toFixed(2)}</td>
             <td>${card.rate.toFixed(2)}</td>
+            <td>${card.minPayment.toFixed(2)}</td>
             <td>${card.allocation.toFixed(2)}</td>
-            <td>${remainingBalance}</td>
+            <td>${remainingBalance.toFixed(2)}</td>
           </tr>
         `;
         });
