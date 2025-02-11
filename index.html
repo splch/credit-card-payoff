@@ -160,6 +160,47 @@
         let cardCount = 0;
 
         /**
+         * Saves the total budget and all credit card details (balance and rate) to localStorage.
+         */
+        function saveData() {
+          const totalBudget = document.getElementById("totalBudget").value;
+          localStorage.setItem("ccpoBudget", totalBudget);
+
+          const cardRows = document.querySelectorAll("#cardsTable tbody tr");
+          const cards = [];
+          cardRows.forEach((row) => {
+            const balance = row.querySelector(".balance").value;
+            const rate = row.querySelector(".rate").value;
+            cards.push({ balance, rate });
+          });
+          localStorage.setItem("ccpoCards", JSON.stringify(cards));
+        }
+
+        /**
+         * Loads the total budget and credit card details from localStorage.
+         */
+        function loadData() {
+          const storedBudget = localStorage.getItem("ccpoBudget");
+          if (storedBudget !== null) {
+            document.getElementById("totalBudget").value = storedBudget;
+          }
+
+          const storedCards = localStorage.getItem("ccpoCards");
+          if (storedCards) {
+            const cardsArray = JSON.parse(storedCards);
+            const tbody = document.querySelector("#cardsTable tbody");
+            tbody.innerHTML = "";
+            cardCount = 0;
+            cardsArray.forEach((card) => {
+              addCardRow(card.balance, card.rate);
+            });
+          } else {
+            // If no saved cards, add an initial card row.
+            addCardRow();
+          }
+        }
+
+        /**
          * Computes a default minimum payment based on the card’s balance.
          * Uses 2% of the balance, but if that is less than $25 (and balance > $25),
          * it returns $25. If the balance is less than $25, the default is the balance.
@@ -228,6 +269,7 @@
           removeBtn.textContent = "Remove";
           removeBtn.addEventListener("click", () => {
             tr.remove();
+            saveData();
           });
           cellAction.appendChild(removeBtn);
 
@@ -239,7 +281,7 @@
           tr.appendChild(cellAction);
           tbody.appendChild(tr);
 
-          // Update Minimum Payment placeholder when balance input changes
+          // Update Minimum Payment placeholder when balance input changes and save data
           inputBalance.addEventListener("input", function () {
             const balanceVal = parseFloat(this.value);
             if (!isNaN(balanceVal) && balanceVal >= 0) {
@@ -249,16 +291,24 @@
             } else {
               inputMinPay.placeholder = "Auto computed";
             }
+            saveData();
           });
+
+          // Save data when interest rate changes
+          inputRate.addEventListener("input", saveData);
+
+          // Optional: Save data when minimum payment input is changed (if user overrides it)
+          inputMinPay.addEventListener("input", saveData);
         };
 
         /**
          * Main function to calculate payment allocation based on user inputs.
          */
         const calculatePayment = () => {
-          // Clear previous error messages
+          // Clear previous error messages.
           document.getElementById("error").textContent = "";
 
+          // Get the total budget entered by the user.
           const totalBudgetInput = document.getElementById("totalBudget").value;
           const totalBudget = parseFloat(totalBudgetInput);
           if (isNaN(totalBudget) || totalBudget < 0) {
@@ -266,13 +316,14 @@
             return;
           }
 
+          // Gather credit card data from each row.
           const cardRows = document.querySelectorAll("#cardsTable tbody tr");
           if (cardRows.length === 0) {
             alert("Please add at least one credit card.");
             return;
           }
 
-          const cards = [];
+          let cards = [];
           let totalMinimumRequired = 0;
           let hasInvalidInput = false;
 
@@ -291,6 +342,7 @@
               return;
             }
 
+            // If the minimum payment is empty or invalid, compute the default value.
             let minPayment;
             if (minPayVal === "" || isNaN(parseFloat(minPayVal))) {
               minPayment = computeDefaultMinPayment(balanceVal);
@@ -298,7 +350,7 @@
               minPayment = parseFloat(minPayVal);
             }
 
-            // Ensure the minimum payment does not exceed the balance.
+            // If the card’s balance is less than the specified minimum, then only pay off the remaining balance.
             if (balanceVal < minPayment) {
               minPayment = balanceVal;
             }
@@ -321,6 +373,7 @@
             return;
           }
 
+          // Check if the total budget is enough to cover all minimum payments.
           if (totalBudget < totalMinimumRequired) {
             document.getElementById("error").textContent =
               "Error: Your total budget is insufficient to cover all minimum payments. Please increase your budget or adjust your inputs.";
@@ -332,6 +385,7 @@
             card.allocation = card.minPayment;
           });
 
+          // Calculate the extra funds available after paying all minimum payments.
           let extraFunds = totalBudget - totalMinimumRequired;
 
           // Allocate extra funds using the debt avalanche method (highest rate first).
@@ -345,6 +399,7 @@
             extraFunds -= additionalPayment;
           });
 
+          // Display the results.
           displayResults(cards, totalBudget);
         };
 
@@ -400,16 +455,20 @@
           resultDiv.innerHTML = tableHTML;
         };
 
-        // Event Listeners for buttons
-        document
-          .getElementById("addCardBtn")
-          .addEventListener("click", () => addCardRow());
+        // Event Listeners
+        document.getElementById("addCardBtn").addEventListener("click", () => {
+          addCardRow();
+          saveData();
+        });
         document
           .getElementById("calculateBtn")
           .addEventListener("click", calculatePayment);
+        document
+          .getElementById("totalBudget")
+          .addEventListener("input", saveData);
 
-        // Add an initial credit card row for user convenience.
-        addCardRow();
+        // Load saved data on initial page load.
+        loadData();
       });
     </script>
   </body>
